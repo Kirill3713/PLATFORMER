@@ -3,12 +3,22 @@
     {
       "name": "Crab",
       "start_pos": [9, 10],
-      "final_pos": [11, 10]
+      "final_pos": [9, 10]
     },
     {
       "name": "Crab",
       "start_pos": [2, 3],
-      "final_pos": [11, 10]
+      "final_pos": [9, 10]
+    },
+    {
+      "name": "Crab",
+      "start_pos": [31, 7],
+      "final_pos": [32, 7]
+    },
+    {
+      "name": "Crab",
+      "start_pos": [17, 3],
+      "final_pos": [22, 3]
     }
   ]
 
