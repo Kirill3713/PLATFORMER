@@ -19,6 +19,11 @@
       "name": "Crab",
       "start_pos": [17, 3],
       "final_pos": [22, 3]
+    },
+    {
+      "name": "Crab",
+      "start_pos": [20, 3],
+      "final_pos": [27, 3]
     }
   ]
 

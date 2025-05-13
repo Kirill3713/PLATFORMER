@@ -10,7 +10,7 @@ SCREEN_HEIGHT = 600
 FPS = 80
 # Масштаб для увеличения тайлов
 TILE_SCALE = 1.5
-
+# Шрифт
 font = pg.font.Font(None, 36)
 # Классы для тайлов
 # Платформа
@@ -62,10 +62,10 @@ class Player(pg.sprite.Sprite):
         keys = pg.key.get_pressed()
         # Перемещение по горизонтали
         if keys[pg.K_LEFT]:
-            self.velocity_x = -20
+            self.velocity_x = -15
             self.current_animation = self.run_animation_left
         elif keys[pg.K_RIGHT]:
-            self.velocity_x = 20
+            self.velocity_x = 15
             self.current_animation = self.run_animation_right
         else:
             if self.current_animation == self.idle_animation_left or self.current_animation == self.run_animation_left or self.current_animation == self.jump_animation_left:
@@ -174,12 +174,12 @@ class Player(pg.sprite.Sprite):
         
         self.jump_animation_left = [pg.transform.flip(image, True, False) for image in self.jump_animation_right]
 
-    def get_damage(self):
+    def get_damage(self, damage):
         """
         Функция для получения урона.
         """
         if pg.time.get_ticks() - self.damage_timer > self.damage_interval:
-            self.hp -= 1
+            self.hp -= damage
             self.damage_timer = pg.time.get_ticks()
 
 # Класс "Краб"
@@ -338,7 +338,68 @@ class Coin(pg.sprite.Sprite):
                 self.current_image = 0
             self.timer = pg.time.get_ticks()
         self.image = self.animation[self.current_image]
-        
+# Класс "Портал"
+class Portal(pg.sprite.Sprite):
+    def __init__(self, x, y):
+        super().__init__()
+        # Объявление свойств класса
+        self.current_image = 0
+        self.load_animation()
+        self.image = self.animation[self.current_image]
+        self.rect = self.image.get_rect()
+        self.rect.center = (x, y)
+
+        self.interval = 150
+        self.timer = pg.time.get_ticks()
+    def load_animation(self):
+        """
+        Анимация.
+        """
+        self.animation = []
+
+        tile_size = 64
+        tile_scale = 4
+        self.animation = []
+        self.num_images = 8
+        a = 0
+        x = 0
+        y = 0
+        spritesheet = pg.image.load("sprites/Green Portal Sprite Sheet.png")
+
+        for i in range(self.num_images):
+            x = tile_size*i
+
+            rect = pg.Rect(x, y, tile_size, tile_size)
+            image = spritesheet.subsurface(rect)
+            image = pg.transform.flip(pg.transform.scale(image, (tile_size*tile_scale, tile_scale*tile_size)), True, False)
+            self.animation.append(image)
+
+    def update(self):
+        """
+        Передвижение
+        """
+        if pg.time.get_ticks() - self.timer >= self.interval:
+            self.current_image += 1
+            if self.current_image >= len(self.animation):
+                self.current_image = 0
+            self.timer = pg.time.get_ticks()
+        self.image = self.animation[self.current_image]
+        # self.rect = self.image.get_rect()
+# Класс иголок
+class Barrier(pg.sprite.Sprite):
+    """
+    Иглы.
+    """
+    def __init__(self, x, y):
+        super().__init__()
+        # Картинка, анимация и нужные переменные
+        self.image = pg.image.load("maps/tileset/PNG/Tiles/tile110.png")
+        self.image = pg.transform.scale(self.image, (48*TILE_SCALE, 48*TILE_SCALE))
+        self.rect = self.image.get_rect()
+
+        self.rect.x = x
+        self.rect.y = y
+
 # Создаем класс игры
 class Game:
     def __init__(self):
@@ -368,8 +429,9 @@ class Game:
         self.balls = pg.sprite.Group()
         self.coins = pg.sprite.Group()
         self.portals = pg.sprite.Group()
+        self.barriers = pg.sprite.Group()
         # Загружаем и обрабатываем карту
-        self.tmx_map = pytmx.load_pygame("maps/level1.tmx")
+        self.tmx_map = pytmx.load_pygame(f"maps/level{self.level}.tmx")
         # Заполняем экран платформами, монетами и порталами
         for layer in self.tmx_map:
             if layer.name == "platforms":
@@ -386,6 +448,20 @@ class Game:
                         coin = Coin(x*self.tmx_map.tilewidth*TILE_SCALE, y*self.tmx_map.tileheight*TILE_SCALE)
                         self.all_sprites.add(coin)
                         self.coins.add(coin)
+            if layer.name == "portal":
+                for x, y, gid in layer:
+                    tile = self.tmx_map.get_tile_image_by_gid(gid)
+                    if tile:
+                        portal = Portal(x*self.tmx_map.tilewidth*TILE_SCALE, y*self.tmx_map.tileheight*TILE_SCALE)
+                        self.all_sprites.add(portal)
+                        self.portals.add(portal)
+            if layer.name == "barrier":
+                for x, y, gid in layer:
+                    tile = self.tmx_map.get_tile_image_by_gid(gid)
+                    if tile:
+                        barrier = Barrier(x*self.tmx_map.tilewidth*TILE_SCALE, y*self.tmx_map.tileheight*TILE_SCALE)
+                        self.barriers.add(barrier)
+                        self.all_sprites.add(barrier)
         self.map_pixel_width = self.tmx_map.width*TILE_SCALE*self.tmx_map.tilewidth
         self.map_pixel_height = self.tmx_map.height*TILE_SCALE*self.tmx_map.tileheight
         # Создаем персонажа
@@ -393,19 +469,19 @@ class Game:
         self.all_sprites.add(self.player)
         # Создаем врага
         self.enemies = pg.sprite.Group()
-        with open("maps/level1_enemies.json", "r", encoding="utf-8") as json_file:
+        with open(f"maps/level{self.level}_enemies.json", "r", encoding="utf-8") as json_file:
             self.data = json.load(json_file)
             for enemy in self.data["enemies"]:
-                    if enemy["name"] == "Crab":
-                        x1 = enemy["start_pos"][0]*self.tmx_map.tilewidth*TILE_SCALE
-                        y1 = enemy["start_pos"][1]*self.tmx_map.tileheight*TILE_SCALE
+                if enemy["name"] == "Crab":
+                    x1 = enemy["start_pos"][0]*self.tmx_map.tilewidth*TILE_SCALE
+                    y1 = enemy["start_pos"][1]*self.tmx_map.tileheight*TILE_SCALE
 
-                        x2 = enemy["final_pos"][0]*self.tmx_map.tilewidth*TILE_SCALE
-                        y2 = enemy["final_pos"][1]*self.tmx_map.tileheight*TILE_SCALE
+                    x2 = enemy["final_pos"][0]*self.tmx_map.tilewidth*TILE_SCALE
+                    y2 = enemy["final_pos"][1]*self.tmx_map.tileheight*TILE_SCALE
 
-                        crab = Crab(self.map_pixel_width, self.map_pixel_height, [x1, y1], [x2, y2])
-                        self.all_sprites.add(crab)
-                        self.enemies.add(crab)
+                    crab = Crab(self.map_pixel_width, self.map_pixel_height, [x1, y1], [x2, y2])
+                    self.all_sprites.add(crab)
+                    self.enemies.add(crab)
         # Запускаем игровой цикл
         self.run()
 
@@ -459,7 +535,7 @@ class Game:
         """
         # Блокируем update, если режим равен проигрышу
         if self.mode == "game over": return
-        # Updatим игрока, шары, монеты, врагов
+        # Updatим игрока, шары, монеты, врагов, порталы
         self.player.update(self.platforms)
         if self.player.rect.y >= self.map_pixel_height:
             self.mode = "game over"
@@ -471,21 +547,36 @@ class Game:
                 ball.kill()
 
         pg.sprite.groupcollide(self.balls, self.enemies, True, True)
-        pg.sprite.groupcollide(self.balls, self.platforms, True, False)
-
+        if self.level != 3:
+            pg.sprite.groupcollide(self.balls, self.platforms, True, False)
+        else:
+            pg.sprite.groupcollide(self.balls, self.platforms, True, True)
         for coin in self.coins:
             coin.update()
 
         for enemy in self.enemies.sprites():
             enemy.update(self.platforms)
             if pg.sprite.collide_mask(self.player, enemy):
-                self.player.get_damage()
+                self.player.get_damage(1)
                 if self.player.hp <= 0:
                     self.mode = "game over"
+
+        for barrier in self.barriers.sprites():
+            if pg.sprite.collide_mask(self.player, barrier):
+                self.player.get_damage(3)
+                if self.player.hp <= 0:
+                    self.mode = "game over"
+
+        for portal in self.portals:
+            portal.update()
         # Собранные монеты
         hits = pg.sprite.spritecollide(self.player, self.coins, True)
         for hit in hits:
             self.collected_coins += 1
+        # Переход на новый уровень
+        if pg.sprite.spritecollide(self.player, self.portals, False):
+            self.level += 1
+            self.setup()
         # Обновляем карту
         self.camera_x = self.player.rect.x - SCREEN_WIDTH//2
         self.camera_y = self.player.rect.y - SCREEN_HEIGHT//2
